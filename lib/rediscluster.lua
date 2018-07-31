@@ -327,9 +327,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
                     --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
-                    --if retry with moved, we will not asking to specific ip,port anymore
-                    targetIp = nil
-                    targetPort = nil
+                    targetIp, targetPort = unpack(ngx.re.match(err, [[^MOVED [^ ]+ ([^:]+):([^ ]+)]], "jo"))
                     self:fetch_slots()
                     needToRetry = true
 
