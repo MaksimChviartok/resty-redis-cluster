@@ -67,6 +67,21 @@ local mt = { __index = _M }
 
 local slot_cache = {}
 
+local function connect(redis_client, ip, port, auth)
+    local ok, err = redis_client:connect(ip, port)
+
+    if ok then
+        local count = redis_client:get_reused_times()
+        if type(auth) == "string" and count == 0 then 
+            _, err = redis_client:auth(auth)
+        end
+
+        return ok
+    end
+
+    return nil, err
+end
+
 
 local function try_hosts_slots(self, serv_list)
     local errors = {}
@@ -79,15 +94,11 @@ local function try_hosts_slots(self, serv_list)
         local ip = serv_list[i].ip
         local port = serv_list[i].port
         local redis_client = redis:new()
-        local ok, err = redis_client:connect(ip, port)
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        local ok, err = connect(redis_client, ip, port, config.auth)
 
         if ok then
-            local count, err, slots_info
-            count, err = redis_client:get_reused_times()
-            if type(config.auth) == "string" and count == 0 then 
-                _, err = redis_client:auth(config.auth)
-            end 
+            local err, slots_info
 
             if not err then 
                 slots_info, err = redis_client:cluster("slots")
@@ -298,7 +309,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
         local redis_client = redis:new()
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
-        local ok, connerr = redis_client:connect(ip, port)
+        local ok, connerr = connect(redis_client, ip, port, config.auth)
 
         if ok then
             if slave then
@@ -505,6 +516,7 @@ function _M.commit_pipeline(self)
         local slave = v.slave
         local redis_client = redis:new()
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        -- local ok, err = connect(redis_client, ip, port, config.auth) -- TODO: I can't test it now
         local ok, err = redis_client:connect(ip, port)
         if slave then
             --set readonly
